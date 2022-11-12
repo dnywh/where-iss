@@ -1,0 +1,5 @@
+# Files I don't want to upload
+secrets.py
+# Computer stuff
+.vscode
+.DS_Store
