@@ -1,13 +1,8 @@
 # Where ISS
 
-Use your Pi Pico and Waveshare ePaper/e-ink display to track the International Space Station's (ISS) whereabouts.
+Use your Pi and Waveshare ePaper/e-ink display to track the International Space Station's (ISS) whereabouts.
 
 This was a long journey for me so I've split the repo up into steps for anyone in a similar situation.
-
-1. **Hello World:** Something you can drag and drop to get the ball rolling. Test that your Raspberry Pi is in order before connecting your e-ink/ePaper display
-2. **Hello Waveshare**: Get your Waveshare display working.
-3. **Hello Internet:** Now let's talk to your Wi-Fi to get the ISS' location and print this to the display
-4. **Hello Images**: Images and type.
 
 ---
 

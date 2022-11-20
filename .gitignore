@@ -3,4 +3,4 @@ secrets.py
 # Computer stuff
 .vscode
 .DS_Store
-.venv
+# .venv
