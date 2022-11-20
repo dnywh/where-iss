@@ -1,2 +1,3 @@
 SSID = "Danny's Home Wi-Fi Network"
 PASSWORD = "gr4c3-h0pp3r!"
+MAPBOX_ACCESS_TOKEN = "EFNOEUG038234r2tgGNSdg39"
