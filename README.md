@@ -4,6 +4,8 @@ Use your Pi and Waveshare ePaper/e-ink display to track the International Space 
 
 This was a long journey for me so I've split the repo up into steps for anyone in a similar situation.
 
+- Copy your own Waveshare driver .py file into the lib/waveshare*epd directory. I've used the 7.5" version, hence \_epd7in5_V2.py*.
+
 ---
 
 ## Files in more detail
