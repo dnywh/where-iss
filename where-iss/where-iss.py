@@ -110,20 +110,16 @@ try:
     # Render everything on screen
     epd.display(epd.getbuffer(image))
 
-    # Delay
-    time.sleep(12)
-
-    # Go to bed
-    logging.info("Clear...")
-    epd.init()
-    epd.Clear()
-
-    logging.info("Go to Sleep...")
-    epd.sleep()
-
+    # Clear screen (commented out so it can stay on)
     # logging.info("Putting display to sleep")
+    
+    # time.sleep(12) # Delay
+    # epd.init()
+    # epd.Clear()
     # epd.sleep()
-    # epd.Dev_exit()
+
+    logging.info("Putting display on pause but keeping what's on screen")
+    epd.sleep()
 
 except IOError as e:
     logging.info(e)

@@ -1,0 +1,4 @@
+44 11 * * * /home/pi/where-iss/where-iss/where-iss-launcher.sh >/home/pi/logs/cronlog.log 2>&1
+45 11 * * * /home/pi/where-iss/where-iss/where-iss-launcher.sh >/home/pi/logs/cronlog.log 2>&1
+46 11 * * * /home/pi/where-iss/where-iss/sleep-launcher.sh >/home/pi/logs/cronlog.log 2>&1
+0 21 * * * /home/pi/where-iss/where-iss/where-iss-launcher.sh >/home/pi/logs/cronlog.log 2>&1

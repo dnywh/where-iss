@@ -1,5 +1,5 @@
 #!/bin/sh
-# launcher.sh
+# # sleep-launcher.sh
 # navigate to home, then script directory, then execute, then back home
 
 # Borrowed from Scott Kildall:
@@ -9,5 +9,5 @@
 
 cd /
 cd home/pi/where-iss/where-iss/
-sudo python3 where-iss.py
+sudo python3 sleep.py
 cd /
