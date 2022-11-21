@@ -1,5 +1,5 @@
 # Clears the Waveshare display and puts it properly to rest
-# I run this on a CRON job so the screen gets a rest overnight
+# I run this on a CRON job so the e-Paper gets a rest overnight
 
 import sys
 import os

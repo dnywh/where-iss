@@ -6,11 +6,20 @@ This was a long journey for me so I've split the repo up into steps for anyone i
 
 - Copy your own Waveshare driver .py file into the lib/waveshare*epd directory. I've used the 7.5" version, hence \_epd7in5_V2.py*.
   - Make appropriate edits at bottom of file. See mine
-- Set a CRON job (see cron.example)
+- Set a CRON job (see cron.example) use crontab guru
   - Make timezone UTC (`sudo raspi-config` > Localisation Options > Timezone > None of the above > UTC)
   - Check via `date`
 
 ---
+
+## Setup
+
+```
+sudo pip3 install spidev # From Waveshare wiki
+# etc
+sudo pip3 install global-land-mask
+
+```
 
 ## Files in more detail
 

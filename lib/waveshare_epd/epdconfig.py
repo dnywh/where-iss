@@ -79,10 +79,10 @@ class RaspberryPi:
         return 0
 
     def module_exit(self):
-        logger.debug("spi end")
+        logger.debug("Closing SPI")
         self.SPI.close()
 
-        logger.debug("close 5V, Module enters 0 power consumption ...")
+        logger.debug("Closing 5V GPIO. e-Paper no longer consuming any power")
         self.GPIO.output(self.RST_PIN, 0)
         self.GPIO.output(self.DC_PIN, 0)
 

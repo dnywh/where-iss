@@ -8,15 +8,20 @@ if os.path.exists(libdir):
 
 import logging
 from waveshare_epd import epd7in5_V2 # Waveshare display stuff
-import time # Delays in seconds
+# import time # Delays in seconds, not used, right? TODO
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance # Image stuff
-import traceback
+# import traceback # TODO: Did removing this do anything? From Waveshare demo
 
 import requests # Needed to check the ISS location
 import secrets  # Needed for Mapbox access token
 import math  # Needed for converting lat and long
-# from gazpacho import Soup # Needed for finding the Mapbox image on the URL
 import urllib.request # Needed for saving the Mapbox image
+from datetime import datetime # For appending a timestamp on file images
+
+# Imports for checking if ISS is over land or water
+# https://github.com/toddkarin/global-land-mask
+# from global_land_mask import globe
+# import numpy as np
 
 mapboxAccessToken = secrets.MAPBOX_ACCESS_TOKEN
 
@@ -27,7 +32,7 @@ logging.basicConfig(level=logging.DEBUG)
 issData = requests.get("http://api.open-notify.org/iss-now.json").json()
 issLat = float(issData['iss_position']['latitude'])
 issLon = float(issData['iss_position']['longitude'])
-
+# print(globe.is_land(issLat, issLon))
 # Convert results to a string
 
 # lat = 'Latitude:   ' + f"{issLat}"
@@ -48,6 +53,7 @@ def deg2num(lat_deg, lon_deg, zoom):
 mapTileNameZoom = 10
 mapTileNameX = deg2num(issLat, issLon, mapTileNameZoom)[0]
 mapTileNameY = deg2num(issLat, issLon, mapTileNameZoom)[1]
+mapTileUrl = f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileNameZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}"
 
 # EDP 7.5" = 800x480
 mapImageWidth = 400
@@ -55,19 +61,16 @@ mapImageHeight = mapImageWidth
 # Square
 mapTileSize = (mapImageWidth, mapImageHeight)
 
-# Update the display
-
 try:
-    print(f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileNameZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}")
+    timeStampNice = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+    logging.info(f"{timeStampNice}: Latitude: {issLat}, Longitude: {issLon}")
+    logging.info(f"Requesting map tile JPG from URL: {mapTileUrl}")
     # Save a copy of the map tile
     urllib.request.urlretrieve(f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileNameZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}", "map-tile.jpg")
-    # url = "https://via.placeholder.com/150"
-    logging.info(f"Latitude: {issLat}, Longitude: {issLon}")
-    # Begin rendering
-    logging.info("Updating display")
-    epd = epd7in5_V2.EPD()
 
-    logging.info("initialising and clearing display")
+    # Begin rendering
+    logging.info("Preparing screen")
+    epd = epd7in5_V2.EPD()
     epd.init()
     epd.Clear()
 
@@ -75,20 +78,28 @@ try:
     # font24 = ImageFont.truetype(os.path.join(picdir, 'Font.ttc'), 24)
     # font32 = ImageFont.truetype(os.path.join(picdir, 'Font.ttc'), 32)
 
-    logging.info("Drawing new image on the horizontal plane...")
-
-    # Create canvas
+    # Create canvas on the horizontal plane
     # https://pillow.readthedocs.io/en/stable/reference/Image.html#constructing-images
-    image = Image.new('1', (epd.width, epd.height), 255)  # 255: clear the frame
-    draw = ImageDraw.Draw(image)
+    canvasHorizontal = Image.new('1', (epd.width, epd.height), 255)  # 255: clear the frame
+    draw = ImageDraw.Draw(canvasHorizontal)
 
     # Construct images
     mapImageColor = Image.open('map-tile.jpg')
     mapImageGrayscale = mapImageColor.convert('L')
     enhancer = ImageEnhance.Contrast(mapImageGrayscale)
-    mapImageGrayscaleBetterContrast = enhancer.enhance(1.5)
+    mapImageGrayscaleBetterContrast = enhancer.enhance(1.5) # 1 = default
     mapImageGrayscaleResized = mapImageGrayscaleBetterContrast.resize(mapTileSize)
     mapImageDithered = mapImageGrayscaleResized.convert('1')
+
+    # Plain version, no edits aside from resize
+    mapImageColorResized = mapImageColor.resize(mapTileSize)
+
+    # Save out image
+    timeStampSlug = datetime.today().strftime('%Y-%m-%d-%H-%M-%S')
+    fullImageUrl = f'{picdir}/map-tile-color-resized-{timeStampSlug}.jpg'
+    mapImageColorResized.save(fullImageUrl)
+
+    logging.info(f"Image saved to: {fullImageUrl}")
 
     # mapImageGrayscaleResized.save('map-tile-grayscale.jpg')
     # mapImageDithered.save('map-tile-dithered.jpg')
@@ -105,20 +116,19 @@ try:
     # Place map image in center
     mapImageX = int((epd.width - mapImageWidth) / 2)
     mapImageY = int((epd.height - mapImageHeight) / 2)
-    image.paste(mapImageDithered, (mapImageX, mapImageY))
+    canvasHorizontal.paste(mapImageColorResized, (mapImageX, mapImageY))
 
     # Render everything on screen
-    epd.display(epd.getbuffer(image))
+    epd.display(epd.getbuffer(canvasHorizontal))
 
     # Clear screen (commented out so it can stay on)
     # logging.info("Putting display to sleep")
-    
     # time.sleep(12) # Delay
     # epd.init()
     # epd.Clear()
     # epd.sleep()
 
-    logging.info("Putting display on pause but keeping what's on screen")
+    # Put e-Paper on pause, keeping what's on screen
     epd.sleep()
 
 except IOError as e:

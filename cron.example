@@ -1,4 +1,7 @@
-44 11 * * * /home/pi/where-iss/where-iss/where-iss-launcher.sh >/home/pi/logs/cronlog.log 2>&1
-45 11 * * * /home/pi/where-iss/where-iss/where-iss-launcher.sh >/home/pi/logs/cronlog.log 2>&1
-46 11 * * * /home/pi/where-iss/where-iss/sleep-launcher.sh >/home/pi/logs/cronlog.log 2>&1
-0 21 * * * /home/pi/where-iss/where-iss/where-iss-launcher.sh >/home/pi/logs/cronlog.log 2>&1
+# Run the where-iss-launcher.sh once every thirtieth minute from 9pm through 11pm UTC
+# Log the result to the cronlog
+*/30 21-23 * * * /home/pi/where-iss/where-iss/where-iss-launcher.sh >/home/pi/logs/cronlog.log 2>&1
+# And again from 12am through 10am UTC because cron doesn't like overnight ranges
+*/30 00-10 * * * /home/pi/where-iss/where-iss/where-iss-launcher.sh >/home/pi/logs/cronlog.log 2>&1
+# Run the sleep-launcher once at 11am
+0 11 * * * /home/pi/where-iss/where-iss/sleep-launcher.sh >/home/pi/logs/cronlog.log 2>&1
