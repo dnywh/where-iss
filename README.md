@@ -14,12 +14,9 @@ This was a long journey for me so I've split the repo up into steps for anyone i
 
 ## Setup
 
-```
-sudo pip3 install spidev # From Waveshare wiki
-# etc
-sudo pip3 install global-land-mask
+### Code formatting
 
-```
+_autopep8_ seems to break the code by rearranging imports. _black_ works for me.
 
 ## Files in more detail
 
