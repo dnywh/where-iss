@@ -63,13 +63,12 @@ mapTileSize = (mapImageWidth, mapImageHeight)
 
 try:
     timeStampNice = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-    logging.info(f"{timeStampNice}: Latitude: {issLat}, Longitude: {issLon}")
+    logging.info(f"Kicking off at {timeStampNice}: Latitude: {issLat}, Longitude: {issLon}")
     logging.info(f"Requesting map tile JPG from URL: {mapTileUrl}")
     # Save a copy of the map tile
     urllib.request.urlretrieve(f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileNameZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}", "map-tile.jpg")
 
     # Begin rendering
-    logging.info("Preparing screen")
     epd = epd7in5_V2.EPD()
     epd.init()
     epd.Clear()
@@ -80,46 +79,50 @@ try:
 
     # Create canvas on the horizontal plane
     # https://pillow.readthedocs.io/en/stable/reference/Image.html#constructing-images
-    canvasHorizontal = Image.new('1', (epd.width, epd.height), 255)  # 255: clear the frame
-    draw = ImageDraw.Draw(canvasHorizontal)
+    canvas = Image.new('1', (epd.width, epd.height), 255)  # 255: clear the frame
+    # Get a drawing context
+    draw = ImageDraw.Draw(canvas)
 
     # Construct images
     mapImageColor = Image.open('map-tile.jpg')
     mapImageGrayscale = mapImageColor.convert('L')
     enhancer = ImageEnhance.Contrast(mapImageGrayscale)
-    mapImageGrayscaleBetterContrast = enhancer.enhance(1.5) # 1 = default
+    mapImageGrayscaleBetterContrast = enhancer.enhance(1.8) # 1 = default
     mapImageGrayscaleResized = mapImageGrayscaleBetterContrast.resize(mapTileSize)
     mapImageDithered = mapImageGrayscaleResized.convert('1')
-
-    # Plain version, no edits aside from resize
-    mapImageColorResized = mapImageColor.resize(mapTileSize)
+    # Assign which of the above I want to have as the end result
+    mapImageEndResult = mapImageGrayscaleResized.resize(mapTileSize)
 
     # Save out image
     timeStampSlug = datetime.today().strftime('%Y-%m-%d-%H-%M-%S')
     fullImageUrl = f'{picdir}/map-tile-color-resized-{timeStampSlug}.jpg'
-    mapImageColorResized.save(fullImageUrl)
-
+    mapImageEndResult.save(fullImageUrl) # Save the image to the appropriate folder
     logging.info(f"Image saved to: {fullImageUrl}")
 
-    # mapImageGrayscaleResized.save('map-tile-grayscale.jpg')
-    # mapImageDithered.save('map-tile-dithered.jpg')
-
-    # Draw stuff
-    draw.text((10, 0), f"Latitude: {issLat}, Longitude: {issLon}", font=font12, fill=0)
-    # draw.text((10, 100), lat, font=font12, fill=0)
-    # draw.text((10, 200), lon, font=font12, fill=0)
-
-    # bmp = Image.open(os.path.join(picdir, 'youtubeIcon.bmp'))
-    # image.paste(bmp, (265, 80))
-    # image.paste(mapImageGrayscaleResized, (0, 40))
 
     # Place map image in center
     mapImageX = int((epd.width - mapImageWidth) / 2)
     mapImageY = int((epd.height - mapImageHeight) / 2)
-    canvasHorizontal.paste(mapImageColorResized, (mapImageX, mapImageY))
+    canvas.paste(mapImageEndResult, (mapImageX, mapImageY))
 
-    # Render everything on screen
-    epd.display(epd.getbuffer(canvasHorizontal))
+    draw.multiline_text((40, 40), f"Latitude: {issLat}\nLongitude: {issLon}", font=font12, fill=0)
+    
+
+    # Render all of the above to the e-Paper
+    epd.display(epd.getbuffer(canvas))
+
+
+    # # Create canvas on the vertical plane (sideways)
+    # # Using this to debug
+    # canvasVertical = Image.new('1', (epd.height, epd.width), 255)  # 255: clear the frame
+    # draw = ImageDraw.Draw(canvasVertical)
+    
+
+    # # Render all of the above to the e-Paper
+    # epd.display(epd.getbuffer(canvasVertical))
+
+
+
 
     # Clear screen (commented out so it can stay on)
     # logging.info("Putting display to sleep")
