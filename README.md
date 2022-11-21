@@ -43,3 +43,18 @@ For all of these (excluding _Hello World_), you need your Wi-Fi credentials. See
 
 1. Change _secrets.example.py_ to _secrets.py_
 2. Fill in your credentials
+
+## Ideas
+
+### Check to see if coordinates are over land or water
+
+...and don't bother rendering if over water.
+
+```py
+# Imports for checking if ISS is over land or water
+# https://github.com/toddkarin/global-land-mask
+from global_land_mask import globe
+import numpy as np
+```
+
+No dice as my Pi Zero W doesn't have enough RAM. So my alternative is using PIL's `getextrema()` to see how much variance there is in the image's pixel values.
