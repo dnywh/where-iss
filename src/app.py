@@ -2,8 +2,11 @@
 import sys
 import os
 
-picdir = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "pic"
+assetdir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "assets"
+)
+exportsdir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "exports"
 )
 libdir = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"
@@ -13,7 +16,13 @@ if os.path.exists(libdir):
 
 import logging  # Write to console
 from waveshare_epd import epd7in5_V2  # Waveshare display
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance  # Image and graphics
+from PIL import (
+    Image,
+    ImageDraw,
+    ImageFont,
+    ImageEnhance,
+    ImageOps,
+)  # Image and graphics
 import requests  # Needed to check the ISS location
 import urllib.request  # Needed for saving the Mapbox image
 import secrets  # Needed for Mapbox access token
@@ -24,7 +33,7 @@ from datetime import datetime  # For appending a timestamp on file images
 logging.basicConfig(level=logging.DEBUG)
 # Required settings
 mapboxAccessToken = secrets.MAPBOX_ACCESS_TOKEN
-mapTileZoom = 6  # 8: ridges, 10: individual crops
+mapTileZoom = 4  # 2: Whole continents, 8: ridges, 10: individual crops
 mapImageWidth = 400  # My Waveshare EDP is 7.5", 800x480, and I want the map image to be a bit smaller
 mapImageHeight = 400  # And I want the map image to be square since the tiles are square
 mapTileSize = (mapImageWidth, mapImageHeight)
@@ -43,7 +52,7 @@ def deg2num(lat_deg, lon_deg, zoom):
     n = 2.0**zoom
     xtile = int((lon_deg + 180.0) / 360.0 * n)
     ytile = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
-    return (xtile, ytile)
+    return (xtile, ytile)  # Store x and y in tuple
 
 
 try:
@@ -64,7 +73,7 @@ try:
     mapTileUrl = f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}"
     logging.info(f"Map tile image: {mapTileUrl}")
 
-    # Download a copy of the map tile and store it locally
+    # Download a copy of the map tile to render to screen. Store it locally
     # TODO: Save in pic folder?
     urllib.request.urlretrieve(
         f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}",
@@ -92,23 +101,33 @@ try:
     # Increase contrast on image
     enhancer = ImageEnhance.Contrast(mapImageGrayscale)
     mapImageGrayscaleBetterContrast = enhancer.enhance(
-        2
+        3
     )  # 1 = no changes, 1.5 = modest
     # mapImageDithered = mapImageGrayscale.convert('1', dither=Image.NONE)
+    invertedImage = ImageOps.invert(mapImageGrayscaleBetterContrast)
     # Resize image
-    mapImageEndResult = mapImageGrayscaleBetterContrast.resize(mapTileSize)
+    mapImageEndResult = invertedImage.resize(mapTileSize)
+
     # Save out image
+    # TODO: Does this still happen even if it doesn't pass quality control? It shouldn't
     timeStampSlug = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
-    fullImageUrl = f"{picdir}/map-tile-{timeStampSlug}.jpg"
+    fullImageUrl = f"{exportsdir}/map-tile-{timeStampSlug}.jpg"
     mapImageEndResult.save(fullImageUrl)  # Save the image to the appropriate folder
     logging.info(f"Image saved to: {fullImageUrl}")
+
+    # Log information to text file
+    # TODO: Does this still happen even if it doesn't pass quality control? It shouldn't
+    with open(f"{exportsdir}/map-tile-{timeStampSlug}.txt", "w") as f:
+        f.write(
+            f"Printed at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom level\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nPixel range:\t{pixelRange}"
+        )
 
     # Begin rendering
     epd = epd7in5_V2.EPD()
     epd.init()
     epd.Clear()
 
-    font12 = ImageFont.truetype(os.path.join(picdir, "Font.ttc"), 12)
+    font12 = ImageFont.truetype(os.path.join(assetdir, "font.ttc"), 12)
 
     # Create image (I'm calling it canvas) on the landscape plane
     # https://pillow.readthedocs.io/en/stable/reference/Image.html#constructing-images
@@ -167,6 +186,7 @@ try:
 except IOError as e:
     logging.info(e)
 
+# Exit plan
 except KeyboardInterrupt:
     logging.info("ctrl + c:")
     epd7in5_V2.epdconfig.module_exit()
