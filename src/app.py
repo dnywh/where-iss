@@ -46,6 +46,7 @@ imageXOffset = 0
 imageYOffset = 12  # Nudge down to match placement in picture frame
 # Useful as ISS spends a lot of time over oceans, which looks boring on e-Paper
 pixelRangeMinimum = 128  # Anything lower than 128 is probably ocean. Images with even a smidge of land tend to be around 200+
+landMassMinPercentage = 0.33  # Anything lower than 25% is probably uninteresting
 # Enable/disable little info display at bottom of map (off by default)
 mapDebug = False
 
@@ -59,8 +60,8 @@ def deg2num(lat_deg, lon_deg, zoom):
     return (xtile, ytile)  # Store x and y in tuple
 
 
+# Kick things off
 try:
-    # Kick things off
     timeStampNice = datetime.today().strftime("%Y-%m-%d %H:%M:%S UTC")
     logging.info(f"Kicking off at {timeStampNice}")
 
@@ -75,7 +76,7 @@ try:
     mapTileNameY = deg2num(issLat, issLon, mapTileZoom)[1]
     # Use all of that to prepare a Mapbox tile image URL
     mapTileUrl = f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}"
-    # logging.info(f"Map tile image: {mapTileUrl}")
+    logging.info(f"Map tile URL: {mapTileUrl}")
 
     # Download a copy of the map tile to render to screen. Store it locally
     # TODO: Save in assets folder instead? Combine with below saving of image anyway? Since the resolution is capped at 512x512 anyway
@@ -87,17 +88,23 @@ try:
     # Make basic edits to image
     mapImageColor = Image.open("map-tile.jpg")
     mapImageGrayscale = mapImageColor.convert("L")
-
+    mapImageDithered = mapImageGrayscale.convert("1")
     # Check to see if image is interesting enough to print to e-Paper...
+    # pixelRange method
     extrema = mapImageGrayscale.getextrema()
     pixelRange = extrema[1] - extrema[0]
-    histogram = mapImageGrayscale.histogram()
+    # histogram method
+    histogram = mapImageDithered.histogram()
+    whitePercentage = histogram[0] / (512 * 512)
+    blackPercentage = histogram[255] / (512 * 512)
+    logging.info(f"Black: {blackPercentage * 100}%, White: {whitePercentage * 100}%")
 
     # Quality control
     # Exit if pixel range is smaller than the minimum
-    if pixelRange <= pixelRangeMinimum:
+    if blackPercentage <= landMassMinPercentage:
         logging.info(
-            f"Pixel range of {pixelRange} probably makes for an uninteresting image. Exiting early and keeping what's already on the e-Paper screen."
+            # f"Pixel range of {pixelRange} probably makes for an uninteresting image. Exiting early and keeping what's already on the e-Paper screen."
+            f"Land mass percentage of {blackPercentage * 100}% probably makes for an uninteresting image. Exiting early and keeping what's already on the e-Paper screen."
         )
         exit()
     # else:
