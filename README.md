@@ -20,6 +20,10 @@ _autopep8_ seems to break the code by rearranging imports. _black_ works for me.
 
 ## Files in more detail
 
+### Zoom
+
+2: whole continents, 4: recognisable contours, 8: ridges, 10: individual crops
+
 <!-- ### Hello World
 
 Using the Waveshare file to make sure everything works as expected.
