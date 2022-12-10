@@ -8,6 +8,6 @@
 # https://www.the-diy-life.com/make-a-youtube-subscriber-counter-using-an-e-ink-display-and-a-raspberry-pi-zero-w/
 
 cd /
-cd home/pi/where-iss/where-iss/
+cd home/pi/where-iss/src/
 sudo python3 sleep.py
 cd /

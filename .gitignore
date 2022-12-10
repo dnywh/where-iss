@@ -1,5 +1,6 @@
-# Files I don't want to upload
+# Files and folders I don't want to upload
 secrets.py
+exports
 # Computer stuff
 .vscode
 .DS_Store

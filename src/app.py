@@ -28,20 +28,24 @@ import urllib.request  # Needed for saving the Mapbox image
 import secrets  # Needed for Mapbox access token
 import math  # Needed for converting lat and long
 from datetime import datetime  # For appending a timestamp on file images
+from random import randrange  # For random map zoom levels
 
 # Settings
 logging.basicConfig(level=logging.DEBUG)
 # Required settings
 mapboxAccessToken = secrets.MAPBOX_ACCESS_TOKEN
-mapTileZoom = 4  # 2: Whole continents, 8: ridges, 10: individual crops
-mapImageWidth = 400  # My Waveshare EDP is 7.5", 800x480, and I want the map image to be a bit smaller
-mapImageHeight = 400  # And I want the map image to be square since the tiles are square
+mapTileZoom = randrange(
+    3, 10
+)  # 2: whole continents, 4: recognisable contours, 8: ridges, 10: individual crops
+mapImageContrast = randrange(1, 5)
+mapImageWidth = 360  # My Waveshare EDP is 7.5", 800x480, and I want the map image to be a bit smaller
+mapImageHeight = 360  # And I want the map image to be square since the tiles are square
 mapTileSize = (mapImageWidth, mapImageHeight)
 # Optional settings
-# Enable/disable only refreshing if interesting image to show (on by default)
+imageXOffset = 0
+imageYOffset = 12  # Nudge down to match placement in picture frame
 # Useful as ISS spends a lot of time over oceans, which looks boring on e-Paper
-qualityControl = True
-pixelRangeMinimum = 64  # Anything lower is probably ocean. Images with even a smidge of land tend to be around 200+
+pixelRangeMinimum = 128  # Anything lower than 128 is probably ocean. Images with even a smidge of land tend to be around 200+
 # Enable/disable little info display at bottom of map (off by default)
 mapDebug = False
 
@@ -58,23 +62,23 @@ def deg2num(lat_deg, lon_deg, zoom):
 try:
     # Kick things off
     timeStampNice = datetime.today().strftime("%Y-%m-%d %H:%M:%S UTC")
-    logging.info(f"Kicking this off at {timeStampNice}")
+    logging.info(f"Kicking off at {timeStampNice}")
 
     # Get ISS latitude and longitude results
     issData = requests.get("http://api.open-notify.org/iss-now.json").json()
     issLat = float(issData["iss_position"]["latitude"])
     issLon = float(issData["iss_position"]["longitude"])
-    logging.info(f"ISS latitude: {issLat}, ISS longitude: {issLon}")
+    # logging.info(f"ISS latitude: {issLat}, ISS longitude: {issLon}")
 
     # Use those ISS coordinates to find corresponding tilenames
     mapTileNameX = deg2num(issLat, issLon, mapTileZoom)[0]
     mapTileNameY = deg2num(issLat, issLon, mapTileZoom)[1]
     # Use all of that to prepare a Mapbox tile image URL
     mapTileUrl = f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}"
-    logging.info(f"Map tile image: {mapTileUrl}")
+    # logging.info(f"Map tile image: {mapTileUrl}")
 
     # Download a copy of the map tile to render to screen. Store it locally
-    # TODO: Save in pic folder?
+    # TODO: Save in assets folder instead? Combine with below saving of image anyway? Since the resolution is capped at 512x512 anyway
     urllib.request.urlretrieve(
         f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}",
         "map-tile.jpg",
@@ -87,22 +91,24 @@ try:
     # Check to see if image is interesting enough to print to e-Paper...
     extrema = mapImageGrayscale.getextrema()
     pixelRange = extrema[1] - extrema[0]
+    histogram = mapImageGrayscale.histogram()
 
-    # Exit if qualityControl is on and pixel range is smaller than the minimum
-    if qualityControl and pixelRange <= pixelRangeMinimum:
+    # Quality control
+    # Exit if pixel range is smaller than the minimum
+    if pixelRange <= pixelRangeMinimum:
         logging.info(
             f"Pixel range of {pixelRange} probably makes for an uninteresting image. Exiting early and keeping what's already on the e-Paper screen."
         )
         exit()
-    else:
-        logging.info(f"Pixel range of {pixelRange}. Let's print.")
+    # else:
+    #     logging.info(f"Pixel range of {pixelRange}. Let's print.")
 
     # Otherwise keep going...
     # Increase contrast on image
     enhancer = ImageEnhance.Contrast(mapImageGrayscale)
     mapImageGrayscaleBetterContrast = enhancer.enhance(
-        3
-    )  # 1 = no changes, 1.5 = modest
+        mapImageContrast
+    )  # 1 = no changes, 1.5 = modest, 2 = noticable
     # mapImageDithered = mapImageGrayscale.convert('1', dither=Image.NONE)
     invertedImage = ImageOps.invert(mapImageGrayscaleBetterContrast)
     # Resize image
@@ -111,16 +117,19 @@ try:
     # Save out image
     # TODO: Does this still happen even if it doesn't pass quality control? It shouldn't
     timeStampSlug = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
-    fullImageUrl = f"{exportsdir}/map-tile-{timeStampSlug}.jpg"
+    shortImageUrl = f"map-tile-{timeStampSlug}.jpg"
+    fullImageUrl = f"{exportsdir}/{shortImageUrl}"
     mapImageEndResult.save(fullImageUrl)  # Save the image to the appropriate folder
-    logging.info(f"Image saved to: {fullImageUrl}")
+    # logging.info(f"Image saved to: {fullImageUrl}")
 
     # Log information to text file
-    # TODO: Does this still happen even if it doesn't pass quality control? It shouldn't
+
+    result = f"File:\t{shortImageUrl}\nPrinted at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom:\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nContrast:\t{mapImageContrast}\nPixel range:\t{pixelRange}\nTile image URL:\t{mapTileUrl}"
+
     with open(f"{exportsdir}/map-tile-{timeStampSlug}.txt", "w") as f:
-        f.write(
-            f"Printed at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom level\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nPixel range:\t{pixelRange}"
-        )
+        f.write(result)
+    # Log same information to console
+    logging.info(f"\n{result}")
 
     # Begin rendering
     epd = epd7in5_V2.EPD()
@@ -136,8 +145,8 @@ try:
     draw = ImageDraw.Draw(canvas)
 
     # Place map image in center of canvas
-    mapImageX = int((epd.width - mapImageWidth) / 2)
-    mapImageY = int((epd.height - mapImageHeight) / 2)
+    mapImageX = int(imageXOffset + (epd.width - mapImageWidth) / 2)
+    mapImageY = int(imageYOffset + (epd.height - mapImageHeight) / 2)
     canvas.paste(mapImageEndResult, (mapImageX, mapImageY))
 
     if mapDebug:
