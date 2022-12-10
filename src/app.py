@@ -13,13 +13,12 @@ if os.path.exists(libdir):
 
 import logging  # Write to console
 from waveshare_epd import epd7in5_V2  # Waveshare display
-from PIL import Image, ImageOps  # Image and graphics
+from PIL import Image, ImageEnhance, ImageOps  # Image and graphics
 import requests  # To check the ISS location
 import urllib.request  # For saving the Mapbox image
 import secrets  # For Mapbox access token
 import math  # For converting lat and long
 from datetime import datetime  # For appending a timestamp on file images
-import time  # For adding delays to code
 
 # Settings
 logging.basicConfig(level=logging.DEBUG)
@@ -33,7 +32,12 @@ imageXOffset = 0
 imageYOffset = 12  # Nudge down to match placement in picture frame
 # Useful as ISS spends a lot of time over oceans, which looks boring on e-Paper
 # pixelRangeMinimum = 128  # Anything lower than 128 is probably ocean. Images with even a smidge of land tend to be around 200+
-minforegroundPercentage = 12  # Anything lower than 25% is probably uninteresting
+minForegroundPercentage = 18  # Anything lower than 18% is probably uninteresting
+# Set zoom range
+# 2: whole continents, 4: recognisable contours, 8: ridges, 10: individual crops
+minZoomLevel = 4
+maxZoomLevel = 10
+contrast = 2  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
 
 # Functions
 # Converts from latitude and longtitude to the Slippy Map tilenames Mapbox wants
@@ -56,7 +60,7 @@ def attemptMapPrint(mapTileZoom):
 
     # Prepare directory for saving image(s)
     timeStampSlugToMin = datetime.today().strftime("%Y-%m-%d-%H-%M")
-    timeStampSlugToSec = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
+    # timeStampSlugToSec = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
     imageDir = os.path.join(exportsdir, timeStampSlugToMin)
     if not os.path.exists(imageDir):
         os.mkdir(imageDir)
@@ -70,19 +74,23 @@ def attemptMapPrint(mapTileZoom):
     # Prepare versions of image
     mapImageColor = Image.open("map-tile.jpg")
     mapImageGrayscale = mapImageColor.convert("L")
-    mapImageDithered = mapImageColor.convert(
-        "1"
-    )  # To accurately represent screen and do histogram math
-    # Check to see if image is interesting enough to print to e-Paper...
+    # Including a dithered version to mimick e-Paper screen for subsequent histogram math
+    mapImageDithered = mapImageColor.convert("1")
+    # Include versions with increased contrast for testing
+    mapImageGrayscaleSharp = ImageEnhance.Contrast(mapImageGrayscale).enhance(contrast)
+    mapImageDitheredSharp = mapImageGrayscaleSharp.convert("1")
+
+    # Get information about image to see if it is interesting enough to print to e-Paper...
+    extrema = mapImageGrayscale.getextrema()
+    pixelRange = extrema[1] - extrema[0]
     histogram = mapImageDithered.histogram()
     backgroundPercentage = int(round(histogram[0] / (512 * 512), 2) * 100)
     foregroundPercentage = int(round(histogram[255] / (512 * 512), 2) * 100)
     logging.info(
-        f"Foreground: {foregroundPercentage}%, Background: {backgroundPercentage}%"
+        f"Foreground: {foregroundPercentage}%, Background: {backgroundPercentage}%. Pixel Range: {pixelRange}"
     )
 
-    # Invert colors if ocean is visible
-    # So that ocean is white and land black
+    # Invert colors if ocean is visible so that ocean is white and land black
     if currentZoomLevel <= 5:
         mapImageInverted = ImageOps.invert(mapImageGrayscale)
         mapImageResult = mapImageInverted
@@ -91,15 +99,15 @@ def attemptMapPrint(mapTileZoom):
 
     # Quality control
     # Check if histogram range is less than minimum
-    if foregroundPercentage <= minforegroundPercentage:
+    if foregroundPercentage <= minForegroundPercentage:
         # Does not pass quality control
         # Create a rejects subdirectory if it doesn't already exist
         rejectsSubDir = os.path.join(imageDir, "rejects")
         if not os.path.exists(rejectsSubDir):
             os.mkdir(rejectsSubDir)
-        # Save out image with zoom level in name
+        # Save out image with zoom level in name (to two decimal places)
         rejectImageUrl = (
-            f"{rejectsSubDir}/{timeStampSlugToSec}-zoom-{currentZoomLevel}.jpg"
+            f"{rejectsSubDir}/{timeStampSlugToMin}-zoom-{currentZoomLevel:02}.jpg"
         )
         mapImageResult.save(rejectImageUrl)
         # Return and try again
@@ -113,18 +121,20 @@ def attemptMapPrint(mapTileZoom):
         # Continue
 
     # Save out image in its directory
-    mapImageDithered.save(f"{imageDir}/{timeStampSlugToSec}-dithered.jpg")
+    mapImageDithered.save(f"{imageDir}/{timeStampSlugToMin}-dithered.jpg")
     # Also save other variants for comparison
-    mapImageColor.save(f"{imageDir}/{timeStampSlugToSec}-color.jpg")
-    mapImageGrayscale.save(f"{imageDir}/{timeStampSlugToSec}-grayscale.jpg")
+    mapImageColor.save(f"{imageDir}/{timeStampSlugToMin}-color.jpg")
+    mapImageGrayscale.save(f"{imageDir}/{timeStampSlugToMin}-grayscale.jpg")
+    mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered-sharp.jpg")
+    mapImageGrayscaleSharp.save(f"{imageDir}/{timeStampSlugToMin}-grayscale-sharp.jpg")
 
     # Log information to text file
-    result = f"Printed at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom:\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nForeground:\t{foregroundPercentage}%\nBackground:\t{backgroundPercentage}%\nTile URL:\t{mapTileUrl}"
+    output = f"Printed at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom:\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nForeground:\t{foregroundPercentage}%\nBackground:\t{backgroundPercentage}%\nPixel range:\t{pixelRange}\nTile URL:\t{mapTileUrl}"
 
-    with open(f"{imageDir}/{timeStampSlugToSec}.txt", "w") as f:
-        f.write(result)
+    with open(f"{imageDir}/{timeStampSlugToMin}.txt", "w") as f:
+        f.write(output)
     # Log same information to console
-    logging.info(f"\n{result}")
+    logging.info(f"\n{output}")
 
     # Resize image
     mapImagePrinted = mapImageResult.resize(mapTileSize)
@@ -164,11 +174,9 @@ try:
     issLon = float(issData["iss_position"]["longitude"])
     logging.info(f"Coordinates: {issLat}, {issLon}")
 
-    minZoomLevel = 3
-    maxZoomLevel = 10
     # Start at max zoom level before zooming out
     currentZoomLevel = maxZoomLevel
-
+    # Decrement through map zoom levels until one is worth printing
     while True:
         logging.info(f"Map zoom: {currentZoomLevel}")
         # Unless the map zoom level has made all attempts within the range...
@@ -176,8 +184,6 @@ try:
         attemptMapPrint(currentZoomLevel)
         # Didn't work? go down a zoom level for next time
         currentZoomLevel -= 1
-        # Wait a second before continuing
-        time.sleep(1)
         # Exit if map printed or couldn't produce desired contrast even at map zoom level 3
         if currentZoomLevel < minZoomLevel:
             logging.info(
