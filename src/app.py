@@ -37,7 +37,7 @@ minForegroundPercentage = 18  # Anything lower than 18% is probably uninterestin
 # 2: whole continents, 4: recognisable contours, 8: ridges, 10: individual crops
 minZoomLevel = 4
 maxZoomLevel = 10
-contrast = 2  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
+contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
 
 # Functions
 # Converts from latitude and longtitude to the Slippy Map tilenames Mapbox wants
@@ -81,9 +81,9 @@ def attemptMapPrint(mapTileZoom):
     mapImageDitheredSharp = mapImageGrayscaleSharp.convert("1")
 
     # Get information about image to see if it is interesting enough to print to e-Paper...
-    extrema = mapImageGrayscale.getextrema()
+    extrema = mapImageGrayscaleSharp.getextrema()
     pixelRange = extrema[1] - extrema[0]
-    histogram = mapImageDithered.histogram()
+    histogram = mapImageDitheredSharp.histogram()
     backgroundPercentage = int(round(histogram[0] / (512 * 512), 2) * 100)
     foregroundPercentage = int(round(histogram[255] / (512 * 512), 2) * 100)
     logging.info(
@@ -92,10 +92,13 @@ def attemptMapPrint(mapTileZoom):
 
     # Invert colors if ocean is visible so that ocean is white and land black
     if currentZoomLevel <= 5:
-        mapImageInverted = ImageOps.invert(mapImageGrayscale)
+        mapImageInverted = ImageOps.invert(mapImageGrayscaleSharp)
         mapImageResult = mapImageInverted
     else:
-        mapImageResult = mapImageGrayscale
+        mapImageResult = mapImageGrayscaleSharp
+
+    # Also make a dithered version for posterity
+    mapRejectImageResult = mapImageResult.convert("1")
 
     # Quality control
     # Check if histogram range is less than minimum
@@ -109,7 +112,7 @@ def attemptMapPrint(mapTileZoom):
         rejectImageUrl = (
             f"{rejectsSubDir}/{timeStampSlugToMin}-zoom-{currentZoomLevel:02}.jpg"
         )
-        mapImageResult.save(rejectImageUrl)
+        mapRejectImageResult.save(rejectImageUrl)
         # Return and try again
         logging.info(
             f"I think this might be an uninteresting image. Zooming out and trying again..."
@@ -121,15 +124,15 @@ def attemptMapPrint(mapTileZoom):
         # Continue
 
     # Save out image in its directory
-    mapImageDithered.save(f"{imageDir}/{timeStampSlugToMin}-dithered.jpg")
+    mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered.jpg")
     # Also save other variants for comparison
     mapImageColor.save(f"{imageDir}/{timeStampSlugToMin}-color.jpg")
-    mapImageGrayscale.save(f"{imageDir}/{timeStampSlugToMin}-grayscale.jpg")
-    mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered-sharp.jpg")
-    mapImageGrayscaleSharp.save(f"{imageDir}/{timeStampSlugToMin}-grayscale-sharp.jpg")
+    # mapImageGrayscale.save(f"{imageDir}/{timeStampSlugToMin}-grayscale.jpg")
+    # mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered-sharp.jpg")
+    # mapImageGrayscaleSharp.save(f"{imageDir}/{timeStampSlugToMin}-grayscale-sharp.jpg")
 
     # Log information to text file
-    output = f"Printed at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom:\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nForeground:\t{foregroundPercentage}%\nBackground:\t{backgroundPercentage}%\nPixel range:\t{pixelRange}\nTile URL:\t{mapTileUrl}"
+    output = f"Printed at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom:\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nContrast:\t{contrast}\nForeground:\t{foregroundPercentage}%\nBackground:\t{backgroundPercentage}%\nPixel range:\t{pixelRange}"
 
     with open(f"{imageDir}/{timeStampSlugToMin}.txt", "w") as f:
         f.write(output)
@@ -156,9 +159,9 @@ def attemptMapPrint(mapTileZoom):
     epd.display(epd.getbuffer(canvas))
 
     # Put e-Paper on pause, keeping what's on screen
-    logging.info(f"Going to sleep. See you next time.")
     # See sleep.py for wiping the screen clean
     epd.sleep()
+    logging.info(f"Going to sleep. See you next time.")
 
     # Exit application
     exit()
