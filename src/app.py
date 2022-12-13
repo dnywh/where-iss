@@ -34,9 +34,10 @@ imageYOffset = 12  # Nudge down to match placement in picture frame
 # pixelRangeMinimum = 128  # Anything lower than 128 is probably ocean. Images with even a smidge of land tend to be around 200+
 minForegroundPercentage = 18  # Anything lower than 18% is probably uninteresting
 # Set zoom range
-# 2: whole continents, 4: recognisable contours, 8: ridges, 10: individual crops
-minZoomLevel = 4
+# 2: whole continents, 4: recognisable contours, 8: ridges, 10: clouds and rivers, 18 trees
 maxZoomLevel = 10
+minZoomLevel = 5
+invertZoomLevel = 6  # At what zoom level to invert the colors
 contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
 
 # Functions
@@ -91,7 +92,7 @@ def attemptMapPrint(mapTileZoom):
     )
 
     # Invert colors if ocean is visible so that ocean is white and land black
-    if currentZoomLevel <= 5:
+    if currentZoomLevel <= invertZoomLevel:
         mapImageInverted = ImageOps.invert(mapImageGrayscaleSharp)
         mapImageResult = mapImageInverted
     else:
