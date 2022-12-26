@@ -1,6 +1,10 @@
-# Where ISS
+# Where ISS?
 
-Use your Pi and Waveshare ePaper/e-ink display to track the International Space Station's (ISS) whereabouts.
+Track the International Space Station's (ISS) orbit by printing what they see of Earth to an e-ink display.
+
+Designed for Raspberry Pi and Waveshare e-Paper display HAT. Likely work on any display with a decent resolution after some minor tweaks.
+
+---
 
 This was a long journey for me so I've split the repo up into steps for anyone in a similar situation.
 
@@ -17,45 +21,3 @@ This was a long journey for me so I've split the repo up into steps for anyone i
 ### Code formatting
 
 _autopep8_ seems to break the code by rearranging imports. _black_ works for me.
-
-## Files in more detail
-
-### Zoom
-
-2: whole continents, 4: recognisable contours, 8: ridges, 10: individual crops
-
-<!-- ### Hello World
-
-Using the Waveshare file to make sure everything works as expected.
-
-### Hello Internet
-
-Talk to the space station. Use secrets.py
-
-### Hello Design
-
-Get fonts and images working. -->
-
----
-
-## Internet
-
-For all of these (excluding _Hello World_), you need your Wi-Fi credentials. See _secrets.example.py_ for that.
-
-1. Change _secrets.example.py_ to _secrets.py_
-2. Fill in your credentials
-
-## Ideas
-
-### Check to see if coordinates are over land or water
-
-...and don't bother rendering if over water.
-
-```py
-# Imports for checking if ISS is over land or water
-# https://github.com/toddkarin/global-land-mask
-from global_land_mask import globe
-import numpy as np
-```
-
-No dice as my Pi Zero W doesn't have enough RAM. So my alternative is using PIL's `getextrema()` to see how much variance there is in the image's pixel values.
