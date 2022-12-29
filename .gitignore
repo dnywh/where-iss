@@ -1,7 +1,7 @@
 # Files and folders I don't want to upload
-secrets.py
+env.py
 exports
 # Computer stuff
 .vscode
 .DS_Store
-# .venv
+.venv

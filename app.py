@@ -1,29 +1,33 @@
 # Imports
 import sys
 import os
-
-exportsdir = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "exports"
-)
-libdir = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"
-)
-if os.path.exists(libdir):
-    sys.path.append(libdir)
-
 import logging  # Write to console
-from waveshare_epd import epd7in5_V2  # Waveshare display
+import math  # For converting lat and long
+from datetime import datetime  # For appending a timestamp on file images
 from PIL import Image, ImageEnhance, ImageOps  # Image and graphics
 import requests  # To check the ISS location
 import urllib.request  # For saving the Mapbox image
-import secrets  # For Mapbox access token
-import math  # For converting lat and long
-from datetime import datetime  # For appending a timestamp on file images
+
+# Get required items from other root-level directories
+libDir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"
+)
+if os.path.exists(libDir):
+    sys.path.append(libDir)
+
+from waveshare_epd import (
+    epd7in5_V2,
+)  # Change to whatever Waveshare model you have, or add a different display's driver to /lib
+
+import env  # For Mapbox access token
+
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Settings
-logging.basicConfig(level=logging.DEBUG)
 # Required settings
-mapboxAccessToken = secrets.MAPBOX_ACCESS_TOKEN
+mapboxAccessToken = env.MAPBOX_ACCESS_TOKEN
 mapImageWidth = 360  # My Waveshare EDP is 7.5", 800x480, and I want the map image to be a bit smaller
 mapImageHeight = 360  # And I want the map image to be square since the tiles are square
 mapTileSize = (mapImageWidth, mapImageHeight)
@@ -39,6 +43,7 @@ maxZoomLevel = 10
 minZoomLevel = 5
 invertZoomLevel = 6  # At what zoom level to invert the colors
 contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
+exportImages = False  # Save both the input and output image in an exports folder
 
 # Functions
 # Converts from latitude and longtitude to the Slippy Map tilenames Mapbox wants
@@ -59,12 +64,12 @@ def attemptMapPrint(mapTileZoom):
     mapTileUrl = f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}"
     logging.info(f"Tile URL: {mapTileUrl}")
 
-    # Prepare directory for saving image(s)
     timeStampSlugToMin = datetime.today().strftime("%Y-%m-%d-%H-%M")
-    # timeStampSlugToSec = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
-    imageDir = os.path.join(exportsdir, timeStampSlugToMin)
-    if not os.path.exists(imageDir):
-        os.mkdir(imageDir)
+    # Prepare directory for saving image(s), if applicable
+    imageDir = os.path.join("exports", timeStampSlugToMin)
+    if exportImages == True:
+        if not os.path.exists(imageDir):
+            os.mkdir(imageDir)
 
     # Download a temporary copy of the map tile to render to screen. Store it locally
     urllib.request.urlretrieve(
@@ -105,15 +110,16 @@ def attemptMapPrint(mapTileZoom):
     # Check if histogram range is less than minimum
     if foregroundPercentage <= minForegroundPercentage:
         # Does not pass quality control
-        # Create a rejects subdirectory if it doesn't already exist
-        rejectsSubDir = os.path.join(imageDir, "rejects")
-        if not os.path.exists(rejectsSubDir):
-            os.mkdir(rejectsSubDir)
-        # Save out image with zoom level in name (to two decimal places)
-        rejectImageUrl = (
-            f"{rejectsSubDir}/{timeStampSlugToMin}-zoom-{currentZoomLevel:02}.jpg"
-        )
-        mapRejectImageResult.save(rejectImageUrl)
+        if exportImages == True:
+            # Create a rejects subdirectory if it doesn't already exist
+            rejectsSubDir = os.path.join(imageDir, "rejects")
+            if not os.path.exists(rejectsSubDir):
+                os.mkdir(rejectsSubDir)
+            # Save out image with zoom level in name (to two decimal places)
+            rejectImageUrl = (
+                f"{rejectsSubDir}/{timeStampSlugToMin}-zoom-{currentZoomLevel:02}.jpg"
+            )
+            mapRejectImageResult.save(rejectImageUrl)
         # Return and try again
         logging.info(
             f"I think this might be an uninteresting image. Zooming out and trying again..."
@@ -124,21 +130,23 @@ def attemptMapPrint(mapTileZoom):
         logging.info(f"Looks good! Let's print.")
         # Continue
 
-    # Save out image in its directory
-    mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered.jpg")
-    # Also save other variants for comparison
-    mapImageColor.save(f"{imageDir}/{timeStampSlugToMin}-color.jpg")
-    # mapImageGrayscale.save(f"{imageDir}/{timeStampSlugToMin}-grayscale.jpg")
-    # mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered-sharp.jpg")
-    # mapImageGrayscaleSharp.save(f"{imageDir}/{timeStampSlugToMin}-grayscale-sharp.jpg")
+    if exportImages == True:
+        # Save out image in its directory
+        mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered.jpg")
+        # Also save other variants for comparison
+        mapImageColor.save(f"{imageDir}/{timeStampSlugToMin}-color.jpg")
+        # mapImageGrayscale.save(f"{imageDir}/{timeStampSlugToMin}-grayscale.jpg")
+        # mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered-sharp.jpg")
+        # mapImageGrayscaleSharp.save(f"{imageDir}/{timeStampSlugToMin}-grayscale-sharp.jpg")
 
-    # Log information to text file
+    # Log information
     output = f"Printed at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom:\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nContrast:\t{contrast}\nForeground:\t{foregroundPercentage}%\nBackground:\t{backgroundPercentage}%\nPixel range:\t{pixelRange}"
-
-    with open(f"{imageDir}/{timeStampSlugToMin}.txt", "w") as f:
-        f.write(output)
-    # Log same information to console
+    # ...to console
     logging.info(f"\n{output}")
+    # ...to image directory, if applicable
+    if exportImages == True:
+        with open(f"{imageDir}/{timeStampSlugToMin}.txt", "w") as f:
+            f.write(output)
 
     # Resize image
     mapImagePrinted = mapImageResult.resize(mapTileSize)
@@ -156,13 +164,13 @@ def attemptMapPrint(mapTileZoom):
     mapImageY = int(imageYOffset + (epd.height - mapImageHeight) / 2)
     canvas.paste(mapImagePrinted, (mapImageX, mapImageY))
 
-    # Render all of the above to the e-Paper
+    # Render all of the above to the display
     epd.display(epd.getbuffer(canvas))
 
-    # Put e-Paper on pause, keeping what's on screen
+    # Put display on pause, keeping what's on screen
     # See sleep.py for wiping the screen clean
     epd.sleep()
-    logging.info(f"Going to sleep. See you next time.")
+    logging.info(f"Finishing printing. Enjoy.")
 
     # Exit application
     exit()
@@ -191,7 +199,7 @@ try:
         # Exit if map printed or couldn't produce desired contrast even at map zoom level 3
         if currentZoomLevel < minZoomLevel:
             logging.info(
-                "I still couldn't get a good map image at these coordinates despite being fully zoomed out. Keeping what's on screen and going to sleep."
+                "I still couldn't get a good map image at these coordinates despite being fully zoomed out. Keeping what's already on screen."
             )
             break
 
