@@ -1,23 +1,23 @@
-# Where ISS?
+# Where ISS
 
 Track the International Space Station's (ISS) orbit by printing what they see of Earth to an e-ink display.
 
 Designed for Raspberry Pi and Waveshare e-Paper display HAT. Likely work on any display with a decent resolution after some minor tweaks.
 
----
+## Prerequisites
 
-This was a long journey for me so I've split the repo up into steps for anyone in a similar situation.
+Where ISS works great with [Pi Frame](https://github.com/dnywh/pi-frame), which includes Waveshare drivers and scheduling templates. Just fill out an _env.py_ file with your [Mapbox access token](https://docs.mapbox.com/help/getting-started/access-tokens/) as shown in [env.example.py](https://github.com/dnywh/where-iss/blob/main/env.example.py).
 
-- Copy your own Waveshare driver .py file into the lib/waveshare*epd directory. I've used the 7.5" version, hence \_epd7in5_V2.py*.
-  - Make appropriate edits at bottom of file. See mine
-- Set a CRON job (see cron.example) use crontab guru
-  - Make timezone UTC (`sudo raspi-config` > Localisation Options > Timezone > None of the above > UTC)
-  - Check via `date`
+### Without Pi Frame
 
----
+You'll need the [Waveshare e-Paper drivers](https://github.com/waveshare/e-Paper/tree/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd) (or whatever display you're using) uploaded to your Raspberry Pi in a sibling _lib_ directory. Here's an example:
 
-## Setup
-
-### Code formatting
-
-_autopep8_ seems to break the code by rearranging imports. _black_ works for me.
+```
+.
+└── where-iss
+└── lib
+    └── waveshare_epd
+        ├── __init__.py
+        ├── epdconfig.py
+        └── epd7in5_V2.py
+```

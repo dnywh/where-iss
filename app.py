@@ -43,7 +43,7 @@ maxZoomLevel = 10
 minZoomLevel = 5
 invertZoomLevel = 6  # At what zoom level to invert the colors
 contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
-exportImages = False  # Save both the input and output image in an exports folder
+exportImages = True  # Save both the input and output image in an exports folder
 
 # Functions
 # Converts from latitude and longtitude to the Slippy Map tilenames Mapbox wants
@@ -66,8 +66,11 @@ def attemptMapPrint(mapTileZoom):
 
     timeStampSlugToMin = datetime.today().strftime("%Y-%m-%d-%H-%M")
     # Prepare directory for saving image(s), if applicable
-    imageDir = os.path.join("exports", timeStampSlugToMin)
+    exportsDir = "exports"
+    imageDir = os.path.join(exportsDir, timeStampSlugToMin)
     if exportImages == True:
+        if not os.path.exists(exportsDir):
+            os.makedirs(exportsDir)
         if not os.path.exists(imageDir):
             os.mkdir(imageDir)
 
@@ -209,6 +212,6 @@ except IOError as e:
 
 # Exit plan
 except KeyboardInterrupt:
-    logging.info("^C:")
+    logging.info("Exited.")
     epd7in5_V2.epdconfig.module_exit()
     exit()
