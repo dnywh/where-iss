@@ -21,3 +21,9 @@ You'll need the [Waveshare e-Paper drivers](https://github.com/waveshare/e-Paper
         ├── epdconfig.py
         └── epd7in5_V2.py
 ```
+
+## Usage
+
+### Running on a schedule
+
+See [Pi Frame](https://github.com/dnywh/pi-frame)!

@@ -8,16 +8,17 @@ from PIL import Image, ImageEnhance, ImageOps  # Image and graphics
 import requests  # To check the ISS location
 import urllib.request  # For saving the Mapbox image
 
+# Prepare directories so they can be reached from anywhere
+appDir = os.path.dirname(os.path.realpath(__file__))
 # Get required items from other root-level directories
-libDir = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"
-)
+parentDir = os.path.dirname(appDir)
+libDir = os.path.join(parentDir, "lib")
 if os.path.exists(libDir):
     sys.path.append(libDir)
-
+# Change the below to whatever Waveshare model you have, or add a different display's driver to /lib
 from waveshare_epd import (
     epd7in5_V2,
-)  # Change to whatever Waveshare model you have, or add a different display's driver to /lib
+)
 
 import env  # For Mapbox access token
 
@@ -60,13 +61,13 @@ def attemptMapPrint(mapTileZoom):
     # Use those ISS coordinates to find corresponding tilenames
     mapTileNameX = deg2num(issLat, issLon, mapTileZoom)[0]
     mapTileNameY = deg2num(issLat, issLon, mapTileZoom)[1]
-    # Retreive a Mapbox tile image
+    # Retrieve a Mapbox tile image
     mapTileUrl = f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}"
     logging.info(f"Tile URL: {mapTileUrl}")
 
     timeStampSlugToMin = datetime.today().strftime("%Y-%m-%d-%H-%M")
     # Prepare directory for saving image(s), if applicable
-    exportsDir = "exports"
+    exportsDir = os.path.join(appDir, "exports")
     imageDir = os.path.join(exportsDir, timeStampSlugToMin)
     if exportImages == True:
         if not os.path.exists(exportsDir):
@@ -75,19 +76,22 @@ def attemptMapPrint(mapTileZoom):
             os.mkdir(imageDir)
 
     # Download a temporary copy of the map tile to render to screen. Store it locally
+    mapImagePath = os.path.join(appDir, "map-tile.jpg")
     urllib.request.urlretrieve(
         f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}",
-        "map-tile.jpg",
+        mapImagePath,
     )
 
     # Prepare versions of image
-    mapImageColor = Image.open("map-tile.jpg")
+    mapImageColor = Image.open(mapImagePath)
     mapImageGrayscale = mapImageColor.convert("L")
-    # Including a dithered version to mimick e-Paper screen for subsequent histogram math
+    # Including a dithered version to mimic e-Paper screen for subsequent histogram math
     mapImageDithered = mapImageColor.convert("1")
     # Include versions with increased contrast for testing
     mapImageGrayscaleSharp = ImageEnhance.Contrast(mapImageGrayscale).enhance(contrast)
     mapImageDitheredSharp = mapImageGrayscaleSharp.convert("1")
+    # Throw away original map tile image since new versions have been made
+    os.remove(mapImagePath)
 
     # Get information about image to see if it is interesting enough to print to e-Paper...
     extrema = mapImageGrayscaleSharp.getextrema()
@@ -106,23 +110,10 @@ def attemptMapPrint(mapTileZoom):
     else:
         mapImageResult = mapImageGrayscaleSharp
 
-    # Also make a dithered version for posterity
-    mapRejectImageResult = mapImageResult.convert("1")
-
     # Quality control
     # Check if histogram range is less than minimum
     if foregroundPercentage <= minForegroundPercentage:
         # Does not pass quality control
-        if exportImages == True:
-            # Create a rejects subdirectory if it doesn't already exist
-            rejectsSubDir = os.path.join(imageDir, "rejects")
-            if not os.path.exists(rejectsSubDir):
-                os.mkdir(rejectsSubDir)
-            # Save out image with zoom level in name (to two decimal places)
-            rejectImageUrl = (
-                f"{rejectsSubDir}/{timeStampSlugToMin}-zoom-{currentZoomLevel:02}.jpg"
-            )
-            mapRejectImageResult.save(rejectImageUrl)
         # Return and try again
         logging.info(
             f"I think this might be an uninteresting image. Zooming out and trying again..."
@@ -135,9 +126,13 @@ def attemptMapPrint(mapTileZoom):
 
     if exportImages == True:
         # Save out image in its directory
-        mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered.jpg")
+        mapImageDitheredSharp.save(
+            os.path.join(imageDir, f"{timeStampSlugToMin}-dithered.jpg")
+        )
+        # mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered.jpg")
         # Also save other variants for comparison
-        mapImageColor.save(f"{imageDir}/{timeStampSlugToMin}-color.jpg")
+        mapImageColor.save(os.path.join(imageDir, f"{timeStampSlugToMin}-color.jpg"))
+        # mapImageColor.save(f"{imageDir}/{timeStampSlugToMin}-color.jpg")
         # mapImageGrayscale.save(f"{imageDir}/{timeStampSlugToMin}-grayscale.jpg")
         # mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered-sharp.jpg")
         # mapImageGrayscaleSharp.save(f"{imageDir}/{timeStampSlugToMin}-grayscale-sharp.jpg")
@@ -148,10 +143,10 @@ def attemptMapPrint(mapTileZoom):
     logging.info(f"\n{output}")
     # ...to image directory, if applicable
     if exportImages == True:
-        with open(f"{imageDir}/{timeStampSlugToMin}.txt", "w") as f:
+        with open(os.path.join(imageDir, f"{timeStampSlugToMin}.txt"), "w") as f:
             f.write(output)
 
-    # Resize image
+    # Resize final image
     mapImagePrinted = mapImageResult.resize(mapTileSize)
 
     # Begin rendering
@@ -160,7 +155,7 @@ def attemptMapPrint(mapTileZoom):
     epd.Clear()
 
     # Create canvas (called 'image' in Pillow docs) on the landscape plane
-    canvas = Image.new("1", (epd.width, epd.height), 255)  # 255: clear the frame
+    canvas = Image.new("1", (epd.width, epd.height), 1)
 
     # Place map image in center of canvas
     mapImageX = int(imageXOffset + (epd.width - mapImageWidth) / 2)
@@ -171,7 +166,6 @@ def attemptMapPrint(mapTileZoom):
     epd.display(epd.getbuffer(canvas))
 
     # Put display on pause, keeping what's on screen
-    # See sleep.py for wiping the screen clean
     epd.sleep()
     logging.info(f"Finishing printing. Enjoy.")
 
@@ -181,7 +175,7 @@ def attemptMapPrint(mapTileZoom):
 
 # Kick things off
 try:
-    timeStampNice = datetime.today().strftime("%Y-%m-%d %H:%M:%S UTC")
+    timeStampNice = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
     logging.info(f"Kicking off at {timeStampNice}")
     # Get ISS latitude and longitude results
     issData = requests.get("http://api.open-notify.org/iss-now.json").json()
@@ -205,7 +199,6 @@ try:
                 "I still couldn't get a good map image at these coordinates despite being fully zoomed out. Keeping what's already on screen."
             )
             break
-
 
 except IOError as e:
     logging.info(e)
