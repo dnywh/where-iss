@@ -5,8 +5,7 @@ import logging  # Write to console
 import math  # For converting lat and long
 from datetime import datetime  # For appending a timestamp on file images
 from PIL import Image, ImageEnhance, ImageOps  # Image and graphics
-import requests  # To check the ISS location
-import urllib.request  # For saving the Mapbox image
+import requests  # To check the ISS location and retrieving Mapbox image
 
 # Prepare directories so they can be reached from anywhere
 appDir = os.path.dirname(os.path.realpath(__file__))
@@ -21,20 +20,30 @@ if os.path.exists(libDir):
 from waveshare_epd import epd5in83_V2 as display
 
 # Adjust your optical offsets from one place
-import layout
+# import layout
+# See Pi Frame for usage:
+# https://github.com/dnywh/pi-frame
 
 import env  # For Mapbox access token
-
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 
 # Settings
 mapboxAccessToken = env.MAPBOX_ACCESS_TOKEN
-containerSize = layout.size
+headers = {"User-Agent": "Where ISS", "From": "endless.paces-03@icloud.com"}
+
+# Shared optical sizing and offsets with Pi Frame
+# containerSize = layout.size
+# offsetX = layout.offsetX
+# offsetY = layout.offsetY
+# Manual optical sizing and offsets
+containerSize = 360
+offsetX = 0
+offsetY = 16
+
 mapTileSize = (containerSize, containerSize)
-offsetX = layout.offsetX
-offsetY = layout.offsetY
+
 # pixelRangeMinimum = 128  # Anything lower than 128 is probably ocean. Images with even a smidge of land tend to be around 200+
 # Useful as ISS spends a lot of time over oceans of solid color
 minForegroundPercentage = 18  # Anything lower than 18% is probably uninteresting
@@ -43,6 +52,7 @@ minForegroundPercentage = 18  # Anything lower than 18% is probably uninterestin
 maxZoomLevel = 10
 minZoomLevel = 4
 invertZoomLevel = 6  # At what zoom level to invert the colors
+backgroundColor = "black"  # A starting background color to invert if necessary
 contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
 exportImages = True  # Save both the input and output image in an exports folder
 debug = False  # Uses known fixed coordinates instead of the ISS coordinates
@@ -74,14 +84,12 @@ def attemptMapPrint(mapTileZoom):
     mapTileUrl = f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}"
     logging.info(f"Tile URL: {mapTileUrl}")
 
-    timeStampSlugToMin = datetime.today().strftime("%Y-%m-%d-%H-%M")
-
-    # Download a temporary copy of the map tile to render to screen. Store it locally
+    # Download a temporary copy of the map tile from the Mapbox API to render to screen
+    r = requests.get(mapTileUrl, headers=headers)
+    # Store it locally
     mapImagePath = os.path.join(appDir, "map-tile.jpg")
-    urllib.request.urlretrieve(
-        f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}",
-        mapImagePath,
-    )
+    with open(mapImagePath, "wb") as f:
+        f.write(r.content)
 
     # Prepare versions of image
     mapImageColor = Image.open(mapImagePath)
@@ -108,8 +116,10 @@ def attemptMapPrint(mapTileZoom):
     if currentZoomLevel <= invertZoomLevel:
         mapImageInverted = ImageOps.invert(mapImageGrayscaleSharp)
         mapImageResult = mapImageInverted
+        backgroundColor = "white"
     else:
         mapImageResult = mapImageGrayscaleSharp
+        backgroundColor = "black"
 
     # Quality control
     # Check if histogram range is less than minimum
@@ -134,6 +144,7 @@ def attemptMapPrint(mapTileZoom):
     if exportImages == True:
         # Prepare directory for saving image(s)
         exportsDir = os.path.join(appDir, "exports")
+        timeStampSlugToMin = datetime.today().strftime("%Y-%m-%d-%H-%M")
         imageDir = os.path.join(exportsDir, timeStampSlugToMin)
         if not os.path.exists(exportsDir):
             os.makedirs(exportsDir)
@@ -162,7 +173,7 @@ def attemptMapPrint(mapTileZoom):
     epd.init()
     epd.Clear()
 
-    canvas = Image.new("1", (epd.width, epd.height), 1)
+    canvas = Image.new("1", (epd.width, epd.height), backgroundColor)
 
     # Calculate top-left starting position
     startX = int(offsetX + (epd.width - containerSize) / 2)
@@ -191,7 +202,9 @@ try:
         )
     else:
         # Get ISS latitude and longitude results
-        issData = requests.get("http://api.open-notify.org/iss-now.json").json()
+        issData = requests.get(
+            "http://api.open-notify.org/iss-now.json", headers=headers
+        ).json()
         issLat = float(issData["iss_position"]["latitude"])
         issLon = float(issData["iss_position"]["longitude"])
         logging.info(f"ISS coordinates: {issLat}, {issLon}")
