@@ -10,15 +10,18 @@ import urllib.request  # For saving the Mapbox image
 
 # Prepare directories so they can be reached from anywhere
 appDir = os.path.dirname(os.path.realpath(__file__))
+assetsDir = os.path.join(appDir, "assets")
 # Get required items from other root-level directories
 parentDir = os.path.dirname(appDir)
 libDir = os.path.join(parentDir, "lib")
 if os.path.exists(libDir):
     sys.path.append(libDir)
-# Change the below to whatever Waveshare model you have, or add a different display's driver to /lib
-from waveshare_epd import (
-    epd7in5_V2,
-)
+
+# Change the below import to match your display's driver
+from waveshare_epd import epd5in83_V2 as display
+
+# Adjust your optical offsets from one place
+import layout
 
 import env  # For Mapbox access token
 
@@ -27,27 +30,25 @@ import env  # For Mapbox access token
 logging.basicConfig(level=logging.DEBUG)
 
 # Settings
-# Required settings
 mapboxAccessToken = env.MAPBOX_ACCESS_TOKEN
-mapImageWidth = 360  # My Waveshare EDP is 7.5", 800x480, and I want the map image to be a bit smaller
-mapImageHeight = 360  # And I want the map image to be square since the tiles are square
-mapTileSize = (mapImageWidth, mapImageHeight)
-# Optional settings
-imageXOffset = 0
-imageYOffset = 12  # Nudge down to match placement in picture frame
-# Useful as ISS spends a lot of time over oceans, which looks boring on e-Paper
+containerSize = layout.size
+mapTileSize = (containerSize, containerSize)
+offsetX = layout.offsetX
+offsetY = layout.offsetY
 # pixelRangeMinimum = 128  # Anything lower than 128 is probably ocean. Images with even a smidge of land tend to be around 200+
+# Useful as ISS spends a lot of time over oceans of solid color
 minForegroundPercentage = 18  # Anything lower than 18% is probably uninteresting
 # Set zoom range
 # 2: whole continents, 4: recognisable contours, 8: ridges, 10: clouds and rivers, 18 trees
 maxZoomLevel = 10
-minZoomLevel = 5
+minZoomLevel = 4
 invertZoomLevel = 6  # At what zoom level to invert the colors
 contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
 exportImages = True  # Save both the input and output image in an exports folder
+debug = False  # Uses known fixed coordinates instead of the ISS coordinates
 
 # Functions
-# Converts from latitude and longtitude to the Slippy Map tilenames Mapbox wants
+# Converts from latitude and longitude to the Slippy Map tilenames Mapbox wants
 def deg2num(lat_deg, lon_deg, zoom):
     lat_rad = math.radians(lat_deg)
     n = 2.0**zoom
@@ -58,22 +59,22 @@ def deg2num(lat_deg, lon_deg, zoom):
 
 # The main map printing function
 def attemptMapPrint(mapTileZoom):
-    # Use those ISS coordinates to find corresponding tilenames
-    mapTileNameX = deg2num(issLat, issLon, mapTileZoom)[0]
-    mapTileNameY = deg2num(issLat, issLon, mapTileZoom)[1]
+    if debug == True:
+        # Use fixed coordinates
+        lat = 37.8683
+        lon = -98.417
+    else:
+        # Use the ISS coordinates which could be over ocean
+        lat = issLat
+        lon = issLon
+
+    mapTileNameX = deg2num(lat, lon, mapTileZoom)[0]
+    mapTileNameY = deg2num(lat, lon, mapTileZoom)[1]
     # Retrieve a Mapbox tile image
     mapTileUrl = f"https://api.mapbox.com/v4/mapbox.satellite/{mapTileZoom}/{mapTileNameX}/{mapTileNameY}@2x.jpg90?access_token={mapboxAccessToken}"
     logging.info(f"Tile URL: {mapTileUrl}")
 
     timeStampSlugToMin = datetime.today().strftime("%Y-%m-%d-%H-%M")
-    # Prepare directory for saving image(s), if applicable
-    exportsDir = os.path.join(appDir, "exports")
-    imageDir = os.path.join(exportsDir, timeStampSlugToMin)
-    if exportImages == True:
-        if not os.path.exists(exportsDir):
-            os.makedirs(exportsDir)
-        if not os.path.exists(imageDir):
-            os.mkdir(imageDir)
 
     # Download a temporary copy of the map tile to render to screen. Store it locally
     mapImagePath = os.path.join(appDir, "map-tile.jpg")
@@ -124,8 +125,21 @@ def attemptMapPrint(mapTileZoom):
         logging.info(f"Looks good! Let's print.")
         # Continue
 
+    # Log information
+    output = f"Printed at:\t{timeStampNice}\nCoordinates:\t{lat}, {lon}\nMap zoom:\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nContrast:\t{contrast}\nForeground:\t{foregroundPercentage}%\nBackground:\t{backgroundPercentage}%\nPixel range:\t{pixelRange}"
+    # ...to console
+    logging.info(f"\n{output}")
+
+    # Save out
     if exportImages == True:
-        # Save out image in its directory
+        # Prepare directory for saving image(s)
+        exportsDir = os.path.join(appDir, "exports")
+        imageDir = os.path.join(exportsDir, timeStampSlugToMin)
+        if not os.path.exists(exportsDir):
+            os.makedirs(exportsDir)
+        if not os.path.exists(imageDir):
+            os.mkdir(imageDir)
+        # Save image in its directory
         mapImageDitheredSharp.save(
             os.path.join(imageDir, f"{timeStampSlugToMin}-dithered.jpg")
         )
@@ -136,31 +150,25 @@ def attemptMapPrint(mapTileZoom):
         # mapImageGrayscale.save(f"{imageDir}/{timeStampSlugToMin}-grayscale.jpg")
         # mapImageDitheredSharp.save(f"{imageDir}/{timeStampSlugToMin}-dithered-sharp.jpg")
         # mapImageGrayscaleSharp.save(f"{imageDir}/{timeStampSlugToMin}-grayscale-sharp.jpg")
-
-    # Log information
-    output = f"Printed at:\t{timeStampNice}\nCoordinates:\t{issLat}, {issLon}\nMap zoom:\t{mapTileZoom}\nTile name:\t{mapTileNameX}, {mapTileNameY}\nContrast:\t{contrast}\nForeground:\t{foregroundPercentage}%\nBackground:\t{backgroundPercentage}%\nPixel range:\t{pixelRange}"
-    # ...to console
-    logging.info(f"\n{output}")
-    # ...to image directory, if applicable
-    if exportImages == True:
+        # Also save text output
         with open(os.path.join(imageDir, f"{timeStampSlugToMin}.txt"), "w") as f:
             f.write(output)
 
     # Resize final image
     mapImagePrinted = mapImageResult.resize(mapTileSize)
 
-    # Begin rendering
-    epd = epd7in5_V2.EPD()
+    # Start rendering
+    epd = display.EPD()
     epd.init()
     epd.Clear()
 
-    # Create canvas (called 'image' in Pillow docs) on the landscape plane
     canvas = Image.new("1", (epd.width, epd.height), 1)
 
-    # Place map image in center of canvas
-    mapImageX = int(imageXOffset + (epd.width - mapImageWidth) / 2)
-    mapImageY = int(imageYOffset + (epd.height - mapImageHeight) / 2)
-    canvas.paste(mapImagePrinted, (mapImageX, mapImageY))
+    # Calculate top-left starting position
+    startX = int(offsetX + (epd.width - containerSize) / 2)
+    startY = int(offsetY + (epd.height - containerSize) / 2)
+
+    canvas.paste(mapImagePrinted, (startX, startY))
 
     # Render all of the above to the display
     epd.display(epd.getbuffer(canvas))
@@ -177,11 +185,16 @@ def attemptMapPrint(mapTileZoom):
 try:
     timeStampNice = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
     logging.info(f"Kicking off at {timeStampNice}")
-    # Get ISS latitude and longitude results
-    issData = requests.get("http://api.open-notify.org/iss-now.json").json()
-    issLat = float(issData["iss_position"]["latitude"])
-    issLon = float(issData["iss_position"]["longitude"])
-    logging.info(f"Coordinates: {issLat}, {issLon}")
+    if debug == True:
+        logging.info(
+            "Debug mode is on. Using fixed coordinates instead of the ISS coordinates."
+        )
+    else:
+        # Get ISS latitude and longitude results
+        issData = requests.get("http://api.open-notify.org/iss-now.json").json()
+        issLat = float(issData["iss_position"]["latitude"])
+        issLon = float(issData["iss_position"]["longitude"])
+        logging.info(f"ISS coordinates: {issLat}, {issLon}")
 
     # Start at max zoom level before zooming out
     currentZoomLevel = maxZoomLevel
@@ -206,5 +219,5 @@ except IOError as e:
 # Exit plan
 except KeyboardInterrupt:
     logging.info("Exited.")
-    epd7in5_V2.epdconfig.module_exit()
+    display.epdconfig.module_exit()
     exit()
