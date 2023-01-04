@@ -4,6 +4,7 @@ import os
 import logging  # Write to console
 import math  # For converting lat and long
 from datetime import datetime  # For appending a timestamp on file images
+
 from PIL import Image, ImageEnhance, ImageOps  # Image and graphics
 import requests  # To check the ISS location and retrieving Mapbox image
 
