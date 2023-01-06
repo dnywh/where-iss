@@ -35,15 +35,17 @@ mapboxAccessToken = env.MAPBOX_ACCESS_TOKEN
 headers = {"User-Agent": "Where ISS", "From": "endless.paces-03@icloud.com"}
 
 # Shared optical sizing and offsets with Pi Frame
-# containerSize = layout.size
+# maskWidth = layout.maskWidth
+# maskHeight = layout.maskHeight
 # offsetX = layout.offsetX
 # offsetY = layout.offsetY
 # Manual optical sizing and offsets
-containerSize = 360
+maskWidth = 360
+maskHeight = maskWidth
 offsetX = 0
 offsetY = 16
 
-mapTileSize = (containerSize, containerSize)
+mapTileSize = (maskWidth, maskWidth)
 
 # pixelRangeMinimum = 128  # Anything lower than 128 is probably ocean. Images with even a smidge of land tend to be around 200+
 # Useful as ISS spends a lot of time over oceans of solid color
@@ -53,8 +55,9 @@ minForegroundPercentage = 18  # Anything lower than 18% is probably uninterestin
 maxZoomLevel = 10
 minZoomLevel = 4
 invertZoomLevel = 6  # At what zoom level to invert the colors
-backgroundColor = "black"  # A starting background color to invert if necessary
 contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
+
+backgroundColor = "black"  # A starting background color to invert if necessary
 exportImages = True  # Save both the input and output image in an exports folder
 debug = False  # Uses known fixed coordinates instead of the ISS coordinates
 
@@ -177,8 +180,8 @@ def attemptMapPrint(mapTileZoom):
     canvas = Image.new("1", (epd.width, epd.height), backgroundColor)
 
     # Calculate top-left starting position
-    startX = int(offsetX + (epd.width - containerSize) / 2)
-    startY = int(offsetY + (epd.height - containerSize) / 2)
+    startX = int(offsetX + (epd.width - maskWidth) / 2)
+    startY = int(offsetY + (epd.height - maskHeight) / 2)
 
     canvas.paste(mapImagePrinted, (startX, startY))
 
