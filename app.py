@@ -58,7 +58,7 @@ invertZoomLevel = 6  # At what zoom level to invert the colors
 contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
 
 backgroundColor = "black"  # A starting background color to invert if necessary
-exportImages = True  # Save both the input and output image in an exports folder
+exportImages = False  # Save both the input and output image in an exports folder
 debug = False  # Uses known fixed coordinates instead of the ISS coordinates
 
 # Functions
