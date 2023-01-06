@@ -34,6 +34,7 @@ logging.basicConfig(level=logging.DEBUG)
 mapboxAccessToken = env.MAPBOX_ACCESS_TOKEN
 headers = {"User-Agent": "Where ISS", "From": "endless.paces-03@icloud.com"}
 
+# Design options
 # Shared optical sizing and offsets with Pi Frame
 # maskWidth = layout.maskWidth
 # maskHeight = layout.maskHeight
@@ -46,7 +47,6 @@ offsetX = 0
 offsetY = 16
 
 mapTileSize = (maskWidth, maskWidth)
-
 # pixelRangeMinimum = 128  # Anything lower than 128 is probably ocean. Images with even a smidge of land tend to be around 200+
 # Useful as ISS spends a lot of time over oceans of solid color
 minForegroundPercentage = 18  # Anything lower than 18% is probably uninteresting
@@ -58,6 +58,8 @@ invertZoomLevel = 6  # At what zoom level to invert the colors
 contrast = 3  # 1 = no changes, 1.5 = modest, 2 = noticeable, 3 = extreme
 
 backgroundColor = "black"  # A starting background color to invert if necessary
+
+# Other
 exportImages = False  # Save both the input and output image in an exports folder
 debug = False  # Uses known fixed coordinates instead of the ISS coordinates
 
